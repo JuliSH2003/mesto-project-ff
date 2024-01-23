@@ -8,7 +8,7 @@ const cardsContainer = document.querySelector('.places__list');
 
 // @todo: Функция создания карточки
 // Функция для создания карточки
-function createCard(item) {
+function createCard(item, onDelete) {
     const сardElement = cardTemplate.querySelector('.card').cloneNode(true);
     const cardImage = сardElement.querySelector('.card__image');
     const cardTitle = сardElement.querySelector('.card__title');
@@ -18,32 +18,27 @@ function createCard(item) {
     cardImage.src = item.link;
     cardImage.alt = item.name;
     cardTitle.textContent = item.name;
-
-    // Навешивание обработчика события на кнопку удаления
-    deleteButton.addEventListener('click', function () {
-        deleteCard(сardElement);
-    });
-
+    deleteButton.addEventListener('click',() => onDelete(сardElement));
     return сardElement;
 }
 
 // @todo: Функция удаления карточки
 // Функция для удаления карточки
-function deleteCard(cardElement) {
+function onDelete(cardElement) {
     cardElement.remove();
 }
 
 // @todo: Вывести карточки на страницу
 // Функция для отображения начальных карточек на странице
-function renderInitialCards(cards) {
+function renderCards(cards) {
     cards.forEach(cardData => {
-        const cardElement = createCard(cardData);
-        cardsContainer.append(cardElement);
+        const сardElement = createCard(cardData, onDelete);
+        cardsContainer.append(сardElement);
     });
 }
 
 // Вызываем функцию отображения карточек при загрузке страницы
-document.addEventListener('DOMContentLoaded', () => renderInitialCards(initialCards));
+document.addEventListener('DOMContentLoaded', () => renderCards(initialCards));
 
 
 
