@@ -1,0 +1,12 @@
+.popup__new-avatar .popup__form {
+	margin-top: 27px;
+}
+
+.popup__new-avatar .popup__content {
+	min-height: 0;
+}
+
+.popup__new-avatar .popup__close {
+	right: -40px;
+	top: -41px;
+}

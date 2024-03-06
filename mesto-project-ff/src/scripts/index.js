@@ -1,14 +1,22 @@
-import { createCard, onDelete, addLike} from './card.js';
+import {createCard, deleteCard, likeHandler} from './card.js';
 import { initialCards } from './cards.js';
-import { toggleModal } from './modal.js';
+import {openModal, closeModal, handleModalClick, handleKeyDown} from './modal.js';
+import {clearValidation, enableValidation, checkInputValidity} from './validation.js';
+import {addLike,
+	deleteLike,
+	onDelete,
+	likesCounter,
+	getInitialCards,
+	getProfileInfo,
+	newAvatar,
+	newCard,
+	updateProfileInfo} from './api.js';
 import '../style.css';
 
-// Получение доступа к основным элементам страницы
 const pageContent = document.querySelector('.page__content');
 const cardContainer = pageContent.querySelector('.places');
 const cardList = cardContainer.querySelector('.places__list');
 
-// Нахождение всех модальных окон на странице и конкретных элементов для интерактивности
 const popups = pageContent.querySelectorAll('.popup');
 const openImagePopup = pageContent.querySelector('.popup_type_image');
 const editProfilePopup = pageContent.querySelector('.popup_type_edit');
@@ -18,7 +26,6 @@ const buttonOpenAddCardPopup = pageContent.querySelector('.profile__add-button')
 const popupImage = pageContent.querySelector('.popup__image');
 const imageTitle = pageContent.querySelector('.popup__caption');
 
-// Получение доступа к формам и их элементам
 const forms = document.forms;
 const formEditProfile = forms['edit-profile'];
 const nameInput = formEditProfile.elements.name;
@@ -28,75 +35,145 @@ const profileDescription = pageContent.querySelector('.profile__description');
 const formNewCard = forms['new-place'];
 const cardName = formNewCard.elements['place-name'];
 const cardLink = formNewCard.elements.link;
+const closeButtons = document.querySelectorAll('.popup__close');
+const submitEditProfileButton = editProfilePopup.querySelector('.popup__button');
+const submitAddCardButton = addCardPopup.querySelector('.popup__button');
 
-// Функция для открытия модального окна с картинкой
+const profileAvatar = pageContent.querySelector('.profile__avatar');
+const avatarPopup = pageContent.querySelector('.popup_type_new-avatar');
+const avatarForm = document.forms['new-avatar'];
+const avatarSubmitButton = avatarForm.querySelector('.popup__button');
+const avatarLinkInput = avatarForm.elements.link;
+
+let myId = '';
+
+// Валидация форм
+const validationConfig = {
+  formSelector: '.popup__form',
+  inputSelector: '.popup__input',
+  submitButtonSelector: '.popup__button',
+  inactiveButtonClass: 'popup__button_disabled',
+  inputErrorClass: 'popup__input_type_error',
+  errorClass: 'popup__error_visible',
+};
+
+enableValidation(validationConfig);
+
+function renderLoading(isLoading, buttonElement) {
+  if (isLoading) {
+    buttonElement.textContent = 'Сохранение...';
+  } else {
+    buttonElement.textContent = '';
+  }
+}
+
 function openImage(cardName, cardLink) {
-  toggleModal(openImagePopup);
+  openModal(openImagePopup);
   popupImage.src = cardLink;
   popupImage.alt = cardName;
   imageTitle.textContent = cardName;
 }
 
-// Функция для обработки отправки формы редактирования профиля
 function handleFormSubmitForEdit(evt) {
   evt.preventDefault();
-  profileTitle.textContent = nameInput.value;
-  profileDescription.textContent = jobInput.value;
-  toggleModal(editProfilePopup);
+  renderLoading(true, submitEditProfileButton);
+  updateProfileInfo(nameInput.value, jobInput.value)
+    .then((userInfo) => {
+      profileTitle.textContent = userInfo.name;
+      profileDescription.textContent = userInfo.about;
+      closeModal(editProfilePopup);
+    })
+    .catch((err) => console.error(err))
+    .finally(() => renderLoading(false, buttonOpenEditProfilePopup));
 }
 
-// Функция для обработки отправки формы добавления новой карточки
 function handleFormSubmitForAddCard(evt) {
   evt.preventDefault();
-  addCardToList(cardName.value, cardLink.value);
+  renderLoading(true, submitAddCardButton);
+  newCard(cardName.value, cardLink.value)
+    .then((card) => {
+      cardList.prepend(createCard(card, onDelete, addLike, openImage));
+      closeModal(addCardPopup);
+      formNewCard.reset();
+    })
+    .catch((err) => console.error(err))
+    .finally(() => renderLoading(false, buttonOpenAddCardPopup));
+}
+
+// Функция для добавления обработчиков событий смены аватара
+function setupAvatarChange() {
+  // Очистка сообщений валидации и начальное состояние формы
+  clearValidation(avatarForm, validationConfig);
+  // Добавление валидации
+  enableValidation(validationConfig);
+  profileAvatar.addEventListener('click', () => {
+    clearValidation(avatarForm, validationConfig);
+    openModal(avatarPopup);
+  });
+  avatarForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (!avatarLinkInput.validity.valid) {
+      checkInputValidity(avatarForm, avatarLinkInput);
+    } else {
+      renderLoading(true, avatarSubmitButton);
+      newAvatar(avatarLinkInput.value)
+        .then((res) => {
+          profileAvatar.style.backgroundImage = `url('${res.avatar}')`;
+          closeModal(avatarPopup);
+        })
+        .catch((err) => {
+          console.error(err);
+        })
+        .finally(() => {
+          renderLoading(false, avatarSubmitButton);
+        });
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  Promise.all([getProfileInfo(), getInitialCards()])
+  .then(([userData, initialCards]) => {
+  myId = userData[`_id`];
+  profileTitle.textContent = userData.name;
+  profileDescription.textContent = userData.about;
+  initialCards.forEach((cardData) => {
+  const cardElement = createCard(cardData, openImage, myId);
+  cardList.append(cardElement);
+  });
+  })
+  .catch((err) => {
+  console.error(err);
+  });
+  setupAvatarChange();
+});
+
+buttonOpenEditProfilePopup.addEventListener('click', () => {
+  clearValidation(formEditProfile, validationConfig);
+  nameInput.value = profileTitle.textContent;
+  jobInput.value = profileDescription.textContent;
+  openModal(editProfilePopup);
+});
+
+buttonOpenAddCardPopup.addEventListener('click', () => {
+  clearValidation(formNewCard, validationConfig);
   formNewCard.reset();
-  toggleModal(addCardPopup);
-}
+  openModal(addCardPopup);
+});
 
-// Функция для добавления карточки, если есть имя и ссылка на изображение
-function addCardToList(cardName, cardLink) {
-  if (cardName && cardLink && cardLink.startsWith('http')) {
-    const cardData = { name: cardName, link: cardLink };
-    // Передаем функцию openImage как аргумент
-    const cardElement = createCard(cardData, onDelete, openImage);
-    cardList.prepend(cardElement);
-  }
-}
-
-// Обработчик событий для отправки формы добавления новой карточки
+formEditProfile.addEventListener('submit', handleFormSubmitForEdit);
 formNewCard.addEventListener('submit', handleFormSubmitForAddCard);
-
-// Обработчик кликов для модальных окон, закрывающий их при клике на оверлей
-function handleModalClick(evt) {
-  if (evt.target.classList.contains('popup')) {
-    toggleModal(evt.target);
-  }
-}
-
-// Обработчик нажатий клавиш для закрытия модальных окон
-function handleKeyDown(evt) {
-  if (evt.key === 'Escape') {
-    popups.forEach(popup => {
-      if (popup.classList.contains('popup_opened')) {
-        toggleModal(popup);
-      }
-    });
-  }
-}
-
-// Добавление обработчиков событий клика для кнопок открытия модальных окон
-buttonOpenEditProfilePopup.addEventListener('click', () => toggleModal(editProfilePopup));
-buttonOpenAddCardPopup.addEventListener('click', () => toggleModal(addCardPopup));
-
-// Добавление обработчиков событий для закрытия модальных окон при клике на оверлей
-popups.forEach(popup => {
+avatarForm.addEventListener('submit', setupAvatarChange);
+popups.forEach((popup) => {
   popup.addEventListener('click', handleModalClick);
 });
 
-// Добавление обработчиков событий для отправки форм
-formEditProfile.addEventListener('submit', handleFormSubmitForEdit);
 
-// Обработчики событий для закрытия модальных окон при нажатии клавиш
-document.addEventListener('keydown', handleKeyDown);
-
-export {openImagePopup, popupImage, imageTitle}
+// Добавление обработчика событий для кнопок закрытия модальных окон
+closeButtons.forEach(button => {
+  button.addEventListener('click', (event) => {
+    // Найти ближайшее модальное окно, которое содержит кнопку закрытия
+    const popup = button.closest('.popup');
+    closeModal(popup);
+  });
+});
