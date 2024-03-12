@@ -1,7 +1,7 @@
-import {createCard, deleteCard, likeHandler} from './card.js';
+import {createCard, deleteCard, likeCard} from './card.js';
 import { initialCards } from './cards.js';
 import {openModal, closeModal, handleModalClick, handleKeyDown} from './modal.js';
-import {clearValidation, enableValidation, checkInputValidity} from './validation.js';
+import {clearValidation, enableValidation} from './validation.js';
 import {addLike,
 	deleteLike,
 	onDelete,
@@ -63,7 +63,7 @@ function renderLoading(isLoading, buttonElement) {
   if (isLoading) {
     buttonElement.textContent = 'Сохранение...';
   } else {
-    buttonElement.textContent = '';
+    buttonElement.textContent = 'Сохранить';
   }
 }
 
@@ -84,26 +84,24 @@ function handleFormSubmitForEdit(evt) {
       closeModal(editProfilePopup);
     })
     .catch((err) => console.error(err))
-    .finally(() => renderLoading(false, buttonOpenEditProfilePopup));
+    .finally(() => renderLoading(false, submitEditProfileButton));
 }
 
 function handleFormSubmitForAddCard(evt) {
   evt.preventDefault();
   renderLoading(true, submitAddCardButton);
   newCard(cardName.value, cardLink.value)
-    .then((card) => {
-      cardList.prepend(createCard(card, onDelete, addLike, openImage));
-      closeModal(addCardPopup);
-      formNewCard.reset();
-    })
+.then((card) => {
+  cardList.prepend(createCard(card, deleteCard, likeCard, openImage, myId));
+  closeModal(addCardPopup);
+  formNewCard.reset();
+})
     .catch((err) => console.error(err))
-    .finally(() => renderLoading(false, buttonOpenAddCardPopup));
+    .finally(() => renderLoading(false, submitAddCardButton));
 }
 
 // Функция для добавления обработчиков событий смены аватара
 function setupAvatarChange() {
-  // Очистка сообщений валидации и начальное состояние формы
-  clearValidation(avatarForm, validationConfig);
   // Добавление валидации
   enableValidation(validationConfig);
   profileAvatar.addEventListener('click', () => {
@@ -112,9 +110,9 @@ function setupAvatarChange() {
   });
   avatarForm.addEventListener('submit', function (event) {
     event.preventDefault();
-    if (!avatarLinkInput.validity.valid) {
-      checkInputValidity(avatarForm, avatarLinkInput);
-    } else {
+    const isFormInvalid = avatarForm.querySelector(`.${validationConfig.inputErrorClass}`);
+
+    if (!isFormInvalid) {
       renderLoading(true, avatarSubmitButton);
       newAvatar(avatarLinkInput.value)
         .then((res) => {
@@ -138,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   profileTitle.textContent = userData.name;
   profileDescription.textContent = userData.about;
   initialCards.forEach((cardData) => {
-  const cardElement = createCard(cardData, openImage, myId);
+  const cardElement = createCard(cardData, deleteCard, likeCard, openImage, myId);
   cardList.append(cardElement);
   });
   })
